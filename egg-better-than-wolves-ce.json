@@ -1,0 +1,111 @@
+{
+  "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2026-06-13T12:00:00+00:00",
+  "name": "Better Than Wolves CE",
+  "author": "phantomic12",
+  "description": "Better Than Wolves Community Edition server. Based on Minecraft 1.5.2 with the Cursed Fabric loader. Automatically installs the BTW mod and optional CraftGuide addon.\r\nWiki: https://wiki.btwce.com/view/Installation",
+  "features": [
+    "eula"
+  ],
+  "docker_images": {
+    "ghcr.io/pterodactyl/yolks:java_8": "Java 8 (Required - BTWCE is based on Minecraft 1.5.2)"
+  },
+  "file_denylist": [],
+  "startup": "java -Xms${JAVA_XMS}M -Xmx${JAVA_XMX}M -jar fabric-server-launch.jar",
+  "config": {
+    "files": {
+      "server.properties": {
+        "parser": "properties",
+        "locate": true,
+        "replace": {
+          "server-port": "{{server.build.default.port}}",
+          "online-mode": "{{ONLINE_MODE}}",
+          "motd": "{{MOTD}}",
+          "max-players": "{{SERVER_MEMORY}}"
+        }
+      },
+      "eula.txt": {
+        "parser": "keyvalue",
+        "locate": true,
+        "replace": {
+          "eula": "true"
+        }
+      }
+    },
+    "startup": {
+      "done": "Done",
+      "kill": "\\/stop"
+    },
+    "logs": {
+      "custom": true,
+      "location": "logs/latest.log"
+    },
+    "stop": "^/stop$"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\n# Better Than Wolves CE - Pterodactyl Egg Installation Script\n# Server Files: /mnt/server\n\napt-get update\napt-get install -y curl jq unzip wget dos2unix\nmkdir -p /mnt/server\ncd /mnt/server\n\n# \u2500\u2500 1. Download and run the Cursed Fabric Installer \u2500\u2500\nif [ ! -f installer.jar ]; then\n  echo \"Downloading Cursed Fabric Installer...\"\n  curl -sSL -o installer.jar \\\n    \"https://github.com/BTW-Community/legacy-fabric-installer/releases/download/1.1.1-btw/cursed-fabric-btw-installer-1.1.6.jar\"\nfi\n\necho \"Running Cursed Fabric Installer (server mode)...\"\njava -jar installer.jar server -dir . -downloadMinecraft\n\nif [ ! -f fabric-server-launch.jar ]; then\n  echo \"ERROR: fabric-server-launch.jar was not created.\"\n  echo \"Trying to find any jar that could be the server launcher...\"\n  ls -la *.jar || true\n  SERVER_JAR=$(find . -maxdepth 1 -name '*.jar' -not -name 'installer.jar' -not -name '*.jar.*' | head -1)\n  if [ -n \"$SERVER_JAR\" ]; then\n    cp \"$SERVER_JAR\" fabric-server-launch.jar\n    echo \"Copied $SERVER_JAR to fabric-server-launch.jar\"\n  fi\nfi\n\n# \u2500\u2500 2. Create mods folder and download BTW mod \u2500\u2500\nmkdir -p mods\n\nif [ ! -f mods/btw-fabric-*.jar ]; then\n  echo \"Downloading Better Than Wolves CE mod...\"\n  BTW_URL=$(curl -sSL \"https://api.github.com/repos/BTW-Community/Cursed-BTW/releases\" | jq -r '.[0].assets[] | select(.name | test(\"debug\") | not) | select(.name | endswith(\".jar\")) | .browser_download_url' | head -1)\n  if [ -n \"$BTW_URL\" ]; then\n    curl -sSL -o mods/btw-mod.jar \"$BTW_URL\"\n    echo \"Downloaded BTW mod: $BTW_URL\"\n  else\n    echo \"WARNING: Could not determine BTW mod download URL\"\n  fi\nfi\n\n# \u2500\u2500 3. Optionally install CraftGuide addon \u2500\u2500\nif [ \"${INSTALL_CRAFT_GUIDE}\" = \"1\" ]; then\n  if [ ! -f mods/craft-guide-*.jar ]; then\n    echo \"Downloading CraftGuide addon...\"\n    CG_URL=$(curl -sSL \"https://api.github.com/repos/BTW-Community/CraftGuide/releases/latest\" | jq -r '.assets[0].browser_download_url')\n    if [ -n \"$CG_URL\" ] && [ \"$CG_URL\" != \"null\" ]; then\n      curl -sSL -o mods/craft-guide.jar \"$CG_URL\"\n      echo \"Downloaded CraftGuide: $CG_URL\"\n    else\n      echo \"WARNING: Could not download CraftGuide\"\n    fi\n  fi\nfi\n\n# \u2500\u2500 4. Accept EULA \u2500\u2500\necho \"eula=true\" > eula.txt\n\n# \u2500\u2500 5. Create default server.properties if missing \u2500\u2500\nif [ ! -f server.properties ]; then\n  cat > server.properties <<'SPROPS'\n#Minecraft server properties\nlevel-name=world\nserver-port=25565\nlevel-seed=\ngamemode=survival\nmax-players=20\nmotd=BTW CE Server\nspawn-protection=16\nonline-mode=true\nwhite-list=false\nlevel-type=default\ndifficulty=2\nallow-nether=true\nspawn-monsters=true\nspawn-animals=true\nview-distance=10\ntick-time=60000\nSPROPS\n  dos2unix server.properties 2>/dev/null || true\nfi\n\n# \u2500\u2500 6. Make scripts executable \u2500\u2500\nchmod +x start.sh 2>/dev/null || true\n\n# \u2500\u2500 7. Clean up installer \u2500\u2500\nrm -f installer.jar\n\necho \"\"\necho \"=====================================\"\necho \"  Better Than Wolves CE installed!\"\necho \"=====================================\"\necho \"Server jar: fabric-server-launch.jar\"\necho \"Mods folder contents:\"\nls -la mods/ 2>/dev/null || echo \"  (empty)\"\necho \"\"\n",
+      "container": "ghcr.io/pterodactyl/yolks:java_8",
+      "entrypoint": "bash"
+    },
+    "startup": "java -Xms${JAVA_XMS}M -Xmx${JAVA_XMX}M -jar fabric-server-launch.jar",
+    "install": "",
+    "stop": "^/stop$"
+  },
+  "variables": [
+    {
+      "name": "Minimum Heap Memory (MB)",
+      "description": "The minimum amount of RAM in megabytes allocated to the Java Virtual Machine.",
+      "env_variable": "JAVA_XMS",
+      "default_value": "512",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|between:128,8192",
+      "field_type": "text"
+    },
+    {
+      "name": "Maximum Heap Memory (MB)",
+      "description": "The maximum amount of RAM in megabytes allocated to the Java Virtual Machine.",
+      "env_variable": "JAVA_XMX",
+      "default_value": "1024",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|between:256,32768",
+      "field_type": "text"
+    },
+    {
+      "name": "MOTD",
+      "description": "The message shown in the server list.",
+      "env_variable": "MOTD",
+      "default_value": "A Better Than Wolves CE Server",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:200",
+      "field_type": "text"
+    },
+    {
+      "name": "Online Mode",
+      "description": "Verify players against Mojang accounts. Set to false to allow cracked/offline clients.",
+      "env_variable": "ONLINE_MODE",
+      "default_value": "true",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "text"
+    },
+    {
+      "name": "Install CraftGuide",
+      "description": "Automatically install the CraftGuide addon on first install. Highly recommended - shows all recipes in-game (press G).",
+      "env_variable": "INSTALL_CRAFT_GUIDE",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "text"
+    }
+  ]
+}
