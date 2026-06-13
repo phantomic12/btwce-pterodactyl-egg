@@ -7,12 +7,12 @@
   "exported_at": "2026-06-13T12:00:00+00:00",
   "name": "Better Than Wolves CE",
   "author": "phantomic12",
-  "description": "Better Than Wolves Community Edition server. Based on Minecraft 1.5.2 with the Cursed Fabric loader. Automatically installs the BTW mod and optional CraftGuide addon.\r\nWiki: https://wiki.btwce.com/view/Installation",
+  "description": "Better Than Wolves Community Edition server. Minecraft 1.6.4 with Legacy Fabric loader and the official BTWCE 3.1.0 mod from Modrinth.\r\nWiki: https://wiki.btwce.com/view/3.0.0_Beta\r\nMod: https://modrinth.com/mod/btwce",
   "features": [
     "eula"
   ],
   "docker_images": {
-    "Java 8": "ghcr.io/pterodactyl/yolks:java_8"
+    "Java 17": "ghcr.io/pterodactyl/yolks:java_17"
   },
   "file_denylist": [],
   "startup": "java -Xms${JAVA_XMS}M -Xmx${JAVA_XMX}M -jar fabric-server-launch.jar",
@@ -48,8 +48,8 @@
   },
   "scripts": {
     "installation": {
-      "script": "#!/bin/bash\n# Better Than Wolves CE - Pterodactyl Egg Installation Script\n# Server Files: /mnt/server\n\napt-get update\napt-get install -y curl jq unzip wget dos2unix\nmkdir -p /mnt/server\ncd /mnt/server\n\n# Step 1: Download and run the Cursed Fabric Installer\nif [ ! -f installer.jar ]; then\n  echo \"Downloading Cursed Fabric Installer...\"\n  curl -sSL -o installer.jar \\\n    \"https://github.com/BTW-Community/legacy-fabric-installer/releases/download/1.1.1-btw/cursed-fabric-btw-installer-1.1.6.jar\"\nfi\n\necho \"Running Cursed Fabric Installer (server mode)...\"\njava -jar installer.jar server -dir . -downloadMinecraft\n\nif [ ! -f fabric-server-launch.jar ]; then\n  echo \"ERROR: fabric-server-launch.jar was not created.\"\n  echo \"Trying to find any jar that could be the server launcher...\"\n  ls -la *.jar || true\n  SERVER_JAR=$(find . -maxdepth 1 -name '*.jar' -not -name 'installer.jar' | head -1)\n  if [ -n \"$SERVER_JAR\" ]; then\n    cp \"$SERVER_JAR\" fabric-server-launch.jar\n    echo \"Copied $SERVER_JAR to fabric-server-launch.jar\"\n  fi\nfi\n\n# Step 2: Create mods folder and download BTW mod\nmkdir -p mods\n\nif ! ls mods/btw-fabric-*.jar 1> /dev/null 2>&1; then\n  echo \"Downloading Better Than Wolves CE mod...\"\n  BTW_URL=$(curl -sSL \"https://api.github.com/repos/BTW-Community/Cursed-BTW/releases\" | jq -r '.[0].assets[] | select(.name | test(\"debug\") | not) | select(.name | endswith(\".jar\")) | .browser_download_url' | head -1)\n  if [ -n \"$BTW_URL\" ] && [ \"$BTW_URL\" != \"null\" ]; then\n    curl -sSL -o mods/btw-mod.jar \"$BTW_URL\"\n    echo \"Downloaded BTW mod: $BTW_URL\"\n  else\n    echo \"WARNING: Could not determine BTW mod download URL\"\n  fi\nfi\n\n# Step 3: Optionally install CraftGuide addon\nif [ \"${INSTALL_CRAFT_GUIDE}\" = \"1\" ]; then\n  if ! ls mods/craft-guide-*.jar 1> /dev/null 2>&1; then\n    echo \"Downloading CraftGuide addon...\"\n    CG_URL=$(curl -sSL \"https://api.github.com/repos/BTW-Community/CraftGuide/releases/latest\" | jq -r '.assets[0].browser_download_url')\n    if [ -n \"$CG_URL\" ] && [ \"$CG_URL\" != \"null\" ]; then\n      curl -sSL -o mods/craft-guide.jar \"$CG_URL\"\n      echo \"Downloaded CraftGuide: $CG_URL\"\n    else\n      echo \"WARNING: Could not download CraftGuide\"\n    fi\n  fi\nfi\n\n# Step 4: Accept EULA\necho \"eula=true\" > eula.txt\n\n# Step 5: Create default server.properties if missing\nif [ ! -f server.properties ]; then\n  cat > server.properties <<'SPROPS'\n#Minecraft server properties\nlevel-name=world\nserver-port=25565\nlevel-seed=\ngamemode=survival\nmax-players=20\nmotd=BTW CE Server\nspawn-protection=16\nonline-mode=true\nwhite-list=false\nlevel-type=default\ndifficulty=2\nallow-nether=true\nspawn-monsters=true\nspawn-animals=true\nview-distance=10\ntick-time=60000\nSPROPS\n  dos2unix server.properties 2>/dev/null || true\nfi\n\n# Step 6: Clean up installer\nrm -f installer.jar\n\necho \"\"\necho \"=====================================\"\necho \"  Better Than Wolves CE installed!\"\necho \"=====================================\"\necho \"Server jar: fabric-server-launch.jar\"\necho \"Mods folder contents:\"\nls -la mods/ 2>/dev/null || echo \"  (empty)\"\necho \"\"\n",
-      "container": "ghcr.io/pterodactyl/yolks:java_8",
+      "script": "#!/bin/bash\n# Better Than Wolves CE - Pterodactyl Egg Installation Script\n# Minecraft 1.6.4 + Legacy Fabric + BTWCE 3.x\n# Server Files: /mnt/server\n\napt-get update\napt-get install -y curl jq unzip wget dos2unix\nmkdir -p /mnt/server\ncd /mnt/server\n\n# Step 1: Download the Legacy Fabric installer\necho \"Downloading Legacy Fabric Installer...\"\ncurl -sSL -o lf-installer.jar \\\n  \"https://maven.legacyfabric.net/net/legacyfabric/fabric-installer/0.11.1/fabric-installer-0.11.1.jar\"\n\n# Step 2: Run installer in server mode with BTWCE-required loader (0.15.11)\n# Wiki note: BTWCE 3.0+ requires Legacy Fabric 0.15.x (NOT 0.16+)\necho \"Running Legacy Fabric Installer (server, MC ${MC_VERSION}, loader 0.15.11)...\"\njava -jar lf-installer.jar server -dir . -mcversion ${MC_VERSION} -loader 0.15.11 -downloadMinecraft\n\nif [ ! -f fabric-server-launch.jar ]; then\n  echo \"WARNING: fabric-server-launch.jar was not created.\"\n  echo \"Listing jars in /mnt/server:\"\n  ls -la *.jar 2>/dev/null || true\n  SERVER_JAR=$(find . -maxdepth 1 -name '*.jar' -not -name 'lf-installer.jar' -not -name '*.jar.*' | head -1)\n  if [ -n \"$SERVER_JAR\" ]; then\n    cp \"$SERVER_JAR\" fabric-server-launch.jar\n    echo \"Copied $SERVER_JAR to fabric-server-launch.jar\"\n  else\n    echo \"ERROR: No server jar found. The legacyfabric.net maven may be temporarily unavailable.\"\n    echo \"Try reinstalling in a few minutes.\"\n    exit 1\n  fi\nfi\n\n# Step 3: Create mods folder and download the BTWCE mod from Modrinth\nmkdir -p mods\n\nif ! ls mods/btwce-*.jar 1> /dev/null 2>&1; then\n  echo \"Downloading BTWCE ${BTWCE_VERSION} from Modrinth...\"\n  BTW_URL=$(curl -sSL \"https://api.modrinth.com/v2/project/btwce/version\" \\\n    | jq -r --arg v \"${BTWCE_VERSION}\" '.[] | select(.version_number == $v) | .files[0].url' \\\n    | head -1)\n  if [ -z \"$BTW_URL\" ] || [ \"$BTW_URL\" = \"null\" ]; then\n    echo \"Requested version '${BTWCE_VERSION}' not found, falling back to latest release...\"\n    BTW_URL=$(curl -sSL \"https://api.modrinth.com/v2/project/btwce/version\" \\\n      | jq -r '[.[] | select(.version_type == \"release\")][0].files[0].url')\n  fi\n  if [ -n \"$BTW_URL\" ] && [ \"$BTW_URL\" != \"null\" ]; then\n    curl -sSL -o mods/btwce-mod.jar \"$BTW_URL\"\n    echo \"Downloaded BTWCE: $BTW_URL\"\n  else\n    echo \"ERROR: Could not download BTWCE mod from Modrinth.\"\n    exit 1\n  fi\nfi\n\n# Step 4: Accept EULA\necho \"eula=true\" > eula.txt\n\n# Step 5: Create default server.properties if missing\nif [ ! -f server.properties ]; then\n  cat > server.properties <<'SPROPS'\n#Minecraft server properties\nlevel-name=world\nserver-port=25565\nlevel-seed=\ngamemode=survival\nmax-players=20\nmotd=BTW CE Server\nspawn-protection=16\nonline-mode=true\nwhite-list=false\nlevel-type=default\ndifficulty=2\nallow-nether=true\nspawn-monsters=true\nspawn-animals=true\nview-distance=10\ntick-time=60000\nSPROPS\n  dos2unix server.properties 2>/dev/null || true\nfi\n\n# Step 6: Clean up installer\nrm -f lf-installer.jar\n\necho \"\"\necho \"=====================================\"\necho \"  Better Than Wolves CE installed!\"\necho \"=====================================\"\necho \"Minecraft: ${MC_VERSION}\"\necho \"Loader: Legacy Fabric 0.15.11\"\necho \"BTWCE: ${BTWCE_VERSION}\"\necho \"Server jar: fabric-server-launch.jar\"\necho \"Mods folder contents:\"\nls -la mods/ 2>/dev/null || echo \"  (empty)\"\necho \"\"\n",
+      "container": "ghcr.io/pterodactyl/yolks:java_17",
       "entrypoint": "bash"
     }
   },
@@ -75,6 +75,26 @@
       "field_type": "text"
     },
     {
+      "name": "Minecraft Version",
+      "description": "The Minecraft version to install. BTWCE 3.x requires 1.6.4.",
+      "env_variable": "MC_VERSION",
+      "default_value": "1.6.4",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|between:3,15",
+      "field_type": "text"
+    },
+    {
+      "name": "BTWCE Version",
+      "description": "The BTWCE mod version to install (from Modrinth). Use 'latest' for newest release, or pin a specific version like 3.1.0.",
+      "env_variable": "BTWCE_VERSION",
+      "default_value": "3.1.0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|between:1,30",
+      "field_type": "text"
+    },
+    {
       "name": "MOTD",
       "description": "The message shown in the server list.",
       "env_variable": "MOTD",
@@ -89,16 +109,6 @@
       "description": "Verify players against Mojang accounts. Set to false to allow cracked/offline clients.",
       "env_variable": "ONLINE_MODE",
       "default_value": "true",
-      "user_viewable": true,
-      "user_editable": true,
-      "rules": "required|boolean",
-      "field_type": "text"
-    },
-    {
-      "name": "Install CraftGuide",
-      "description": "Automatically install the CraftGuide addon on first install. Highly recommended - shows all recipes in-game (press G).",
-      "env_variable": "INSTALL_CRAFT_GUIDE",
-      "default_value": "1",
       "user_viewable": true,
       "user_editable": true,
       "rules": "required|boolean",
